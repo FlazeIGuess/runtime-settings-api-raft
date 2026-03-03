@@ -1,0 +1,20 @@
+{
+  "name": "RuntimeSettingsAPI",
+  "version": "1.0.0",
+  "description": "Extends Extra Settings API with runtime manipulation of settings visibility and state",
+  "author": "Community",
+  "license": "MIT",
+  "icon": "icon.png",
+  "banner": "banner.png",
+  "gameVersion": "Update 14",
+  "requiredByAllPlayers": false,
+  "isModPermanent": false,
+  "excludedFiles": [],
+  "updateUrl": "",
+  "requiredMods": [
+    {
+      "name": "ExtraSettingsAPI",
+      "version": "1.0.0"
+    }
+  ]
+}
