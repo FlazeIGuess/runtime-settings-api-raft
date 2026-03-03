@@ -7,7 +7,12 @@ using UnityEngine;
 /// RuntimeSettingsAPI Helper - Copy this file into your mod to use RuntimeSettingsAPI
 ///
 /// This helper silently waits for RuntimeSettingsAPI to be ready in the background and
-/// provides a simple interface for hiding/showing/enabling/disabling settings at runtime.
+/// provides a simple interface for enabling/disabling settings at runtime.
+///
+/// For hiding or showing settings at runtime, use Extra Settings API's built-in
+/// CheckSettingVisibility and HandleSettingVisible instead:
+///   https://github.com/Aidanamite/Extra-Settings-API/wiki/API-Calls#void-checksettingvisibility
+///   https://github.com/Aidanamite/Extra-Settings-API/wiki/API-Events#handlesettingvisiblestringbool
 ///
 /// Usage:
 ///   1. Copy this file into your mod's source folder
@@ -15,7 +20,7 @@ using UnityEngine;
 ///   3. Use the helper methods from your Mod class
 ///
 /// Example:
-///   RuntimeSettingsAPIHelper.HideSection(this, "MyMod", "advancedSection");
+///   RuntimeSettingsAPIHelper.DisableSetting(this, "MyMod", "worldGenSeed");
 /// </summary>
 public static class RuntimeSettingsAPIHelper
 {
@@ -87,18 +92,6 @@ public static class RuntimeSettingsAPIHelper
     /// <param name="modName">Exact mod name as declared in modinfo.json</param>
     /// <param name="settingName">Setting name key from modinfo.json</param>
     /// <param name="timeoutSeconds">How long to wait for the API before giving up (default 30 s)</param>
-    public static void HideSetting(MonoBehaviour mono, string modName, string settingName, float timeoutSeconds = 30f)
-        => mono.StartCoroutine(OperationCoroutine("HideSetting", modName, settingName, timeoutSeconds));
-
-    public static void ShowSetting(MonoBehaviour mono, string modName, string settingName, float timeoutSeconds = 30f)
-        => mono.StartCoroutine(OperationCoroutine("ShowSetting", modName, settingName, timeoutSeconds));
-
-    public static void HideSection(MonoBehaviour mono, string modName, string sectionName, float timeoutSeconds = 30f)
-        => mono.StartCoroutine(OperationCoroutine("HideSection", modName, sectionName, timeoutSeconds));
-
-    public static void ShowSection(MonoBehaviour mono, string modName, string sectionName, float timeoutSeconds = 30f)
-        => mono.StartCoroutine(OperationCoroutine("ShowSection", modName, sectionName, timeoutSeconds));
-
     public static void DisableSetting(MonoBehaviour mono, string modName, string settingName, float timeoutSeconds = 30f)
         => mono.StartCoroutine(OperationCoroutine("DisableSetting", modName, settingName, timeoutSeconds));
 

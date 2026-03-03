@@ -1,9 +1,7 @@
-using HarmonyLib;
 using HMLLibrary;
 using RaftModLoader;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
@@ -11,9 +9,10 @@ namespace RuntimeSettingsAPI
 {
     /// <summary>
     /// Runtime Settings API - A standalone mod that extends Extra Settings API
-    /// Allows mods to dynamically show/hide/enable/disable settings at runtime
-    /// Uses reflection to access ExtraSettingsAPI types at runtime
-    /// Works by directly manipulating GameObject visibility (SetActive)
+    /// Allows mods to disable/enable settings at runtime (visible but non-interactive).
+    /// For hiding/showing settings at runtime, use Extra Settings API's built-in
+    /// CheckSettingVisibility and HandleSettingVisible instead.
+    /// Uses reflection to access ExtraSettingsAPI types at runtime.
     /// </summary>
     public class RuntimeSettingsAPI : Mod
     {
@@ -23,34 +22,11 @@ namespace RuntimeSettingsAPI
         // Runtime state storage for each setting
         private static Dictionary<string, Dictionary<string, SettingRuntimeState>> modSettingsRuntimeState;
         private static bool isInitialized = false;
-        
-        // Pending operations to apply when settings are loaded
-        private static Dictionary<string, List<PendingOperation>> pendingOperations;
 
         // Reflected types from ExtraSettingsAPI (loaded at runtime)
-        private static Type modSettingType;
         private static Type extraSettingsAPIType;
         private static FieldInfo modSettingsField;
         private static bool reflectionInitialized = false;
-        
-        // Harmony patch to persist visibility state across ToggleSettings calls
-        private static Harmony harmonyInstance;
-        
-        private enum OperationType
-        {
-            HideSetting,
-            ShowSetting,
-            HideSection,
-            ShowSection,
-            DisableSetting,
-            EnableSetting
-        }
-        
-        private class PendingOperation
-        {
-            public OperationType Type;
-            public string TargetName;
-        }
 
         public void Start()
         {
@@ -83,105 +59,7 @@ namespace RuntimeSettingsAPI
 
         public void OnDestroy()
         {
-            harmonyInstance?.UnpatchAll(harmonyInstance.Id);
-            harmonyInstance = null;
             Log("Runtime Settings API unloaded");
-        }
-
-        /// <summary>
-        /// Apply a Harmony postfix to ModSettingContainer.ToggleSettings(bool on).
-        /// ExtraSettingsAPI's ToggleSettings re-shows all settings via ShouldShow();
-        /// our postfix immediately re-hides any setting that RuntimeSettingsAPI has marked hidden,
-        /// so the hidden state persists across section collapses/expands.
-        /// </summary>
-        private static void ApplyHarmonyPatch()
-        {
-            try
-            {
-                var containerType = extraSettingsAPIType.Assembly.GetType("_ExtraSettingsAPI.ModSettingContainer");
-                if (containerType == null)
-                {
-                    LogError("Could not find ModSettingContainer type for Harmony patch");
-                    return;
-                }
-
-                var toggleMethod = containerType.GetMethod("ToggleSettings", new Type[] { typeof(bool) });
-                if (toggleMethod == null)
-                {
-                    LogError("Could not find ToggleSettings(bool) method for Harmony patch");
-                    return;
-                }
-
-                harmonyInstance = new Harmony("com.RuntimeSettingsAPI.patch");
-                var postfix = typeof(RuntimeSettingsAPI).GetMethod(
-                    nameof(ToggleSettings_Postfix),
-                    BindingFlags.Static | BindingFlags.NonPublic);
-
-                harmonyInstance.Patch(toggleMethod, postfix: new HarmonyMethod(postfix));
-            }
-            catch (Exception e)
-            {
-                LogError($"Failed to apply Harmony patch to ToggleSettings: {e}");
-            }
-        }
-
-        /// <summary>
-        /// Harmony postfix for ModSettingContainer.ToggleSettings(bool on).
-        /// Runs AFTER ExtraSettingsAPI has re-shown settings via ShouldShow().
-        /// Re-hides any setting (or setting in a hidden section) that RuntimeSettingsAPI has marked hidden.
-        /// </summary>
-        private static void ToggleSettings_Postfix(object __instance, bool on)
-        {
-            // Only need to re-hide when the section is being shown (on = true)
-            if (!on || !isInitialized) return;
-
-            try
-            {
-                var modNameField = __instance.GetType().GetField("ModName");
-                var modName = modNameField?.GetValue(__instance) as string;
-                if (string.IsNullOrEmpty(modName)) return;
-
-                if (!modSettingsRuntimeState.TryGetValue(modName, out var settingStates)) return;
-
-                var allSettingsField = __instance.GetType().GetField("allSettings");
-                var allSettings = allSettingsField?.GetValue(__instance) as System.Collections.IList;
-                if (allSettings == null) return;
-
-                foreach (var setting in allSettings)
-                {
-                    var nameField = setting.GetType().GetField("name");
-                    var name = nameField?.GetValue(setting) as string ?? "";
-
-                    var sectionField = setting.GetType().GetField("section");
-                    var section = sectionField?.GetValue(setting) as string;
-
-                    var controlProp = setting.GetType().GetProperty("control");
-                    var control = controlProp?.GetValue(setting) as GameObject;
-                    if (control == null) continue;
-
-                    // Hide if this setting itself is marked hidden
-                    if (!string.IsNullOrEmpty(name)
-                        && settingStates.TryGetValue(name, out var nameState)
-                        && !nameState.IsVisible)
-                    {
-                        control.SetActive(false);
-                        continue;
-                    }
-
-                    // Hide if this setting belongs to a hidden section
-                    // (also covers unnamed text/separator items that cannot be tracked by name)
-                    if (!string.IsNullOrEmpty(section)
-                        && settingStates.TryGetValue(section, out var sectionState)
-                        && !sectionState.IsVisible)
-                    {
-                        control.SetActive(false);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                LogError($"Error in ToggleSettings postfix: {e.Message}");
-            }
         }
 
         /// <summary>
@@ -216,10 +94,9 @@ namespace RuntimeSettingsAPI
                 if (extraSettingsAssembly == null)
                     return false; // still waiting — silent
 
-                modSettingType = extraSettingsAssembly.GetType("_ExtraSettingsAPI.ModSetting");
                 extraSettingsAPIType = extraSettingsAssembly.GetType("_ExtraSettingsAPI.ExtraSettingsAPI");
 
-                if (modSettingType == null || extraSettingsAPIType == null)
+                if (extraSettingsAPIType == null)
                 {
                     LogError("ExtraSettingsAPI found but required types are missing — cannot initialize.");
                     return false;
@@ -234,7 +111,6 @@ namespace RuntimeSettingsAPI
 
                 reflectionInitialized = true;
                 Log("Runtime Settings API ready.");
-                ApplyHarmonyPatch();
                 return true;
             }
             catch (Exception e)
@@ -249,7 +125,6 @@ namespace RuntimeSettingsAPI
             if (!isInitialized)
             {
                 modSettingsRuntimeState = new Dictionary<string, Dictionary<string, SettingRuntimeState>>();
-                pendingOperations = new Dictionary<string, List<PendingOperation>>();
                 isInitialized = true;
             }
         }
@@ -277,7 +152,6 @@ namespace RuntimeSettingsAPI
 
         private class SettingRuntimeState
         {
-            public bool IsVisible { get; set; } = true;
             public bool IsEnabled { get; set; } = true;
             public bool WasModified { get; set; } = false;
         }
@@ -309,65 +183,6 @@ namespace RuntimeSettingsAPI
         #endregion
 
         #region Helper Methods
-
-        private static void AddPendingOperation(string modName, OperationType type, string targetName)
-        {
-            EnsureInitialized();
-            
-            if (!pendingOperations.ContainsKey(modName))
-                pendingOperations[modName] = new List<PendingOperation>();
-            
-            pendingOperations[modName].Add(new PendingOperation
-            {
-                Type = type,
-                TargetName = targetName
-            });
-        }
-        
-        private static void ApplyPendingOperations(string modName)
-        {
-            if (!pendingOperations.ContainsKey(modName))
-                return;
-            
-            var operations = pendingOperations[modName];
-            
-            foreach (var op in operations)
-            {
-                switch (op.Type)
-                {
-                    case OperationType.HideSetting:
-                        HideSettingInternal(modName, op.TargetName);
-                        break;
-                    case OperationType.ShowSetting:
-                        ShowSetting(modName, op.TargetName);
-                        break;
-                    case OperationType.HideSection:
-                        HideSectionInternal(modName, op.TargetName);
-                        break;
-                    case OperationType.ShowSection:
-                        ShowSection(modName, op.TargetName);
-                        break;
-                    case OperationType.DisableSetting:
-                        DisableSetting(modName, op.TargetName);
-                        break;
-                    case OperationType.EnableSetting:
-                        EnableSetting(modName, op.TargetName);
-                        break;
-                }
-            }
-            
-            pendingOperations.Remove(modName);
-            RefreshSettingsUI();
-        }
-        
-        /// <summary>
-        /// Call this method to manually trigger pending operations for a mod
-        /// Useful if you know your settings have been loaded
-        /// </summary>
-        public static void ApplyPendingOperationsForMod(string modName)
-        {
-            ApplyPendingOperations(modName);
-        }
 
         private static Mod FindMod(string modName)
         {
@@ -452,46 +267,6 @@ namespace RuntimeSettingsAPI
             return null;
         }
 
-        private static List<object> GetSettingsInSection(Mod mod, string sectionName)
-        {
-            var result = new List<object>();
-            if (mod == null) return result;
-
-            try
-            {
-                var modSettings = modSettingsField.GetValue(null) as System.Collections.IDictionary;
-                if (modSettings == null || !modSettings.Contains(mod))
-                    return result;
-
-                var container = modSettings[mod];
-                var allSettingsField = container.GetType().GetField("allSettings");
-                
-                if (allSettingsField != null)
-                {
-                    var allSettings = allSettingsField.GetValue(container) as System.Collections.IList;
-                    if (allSettings != null)
-                    {
-                        foreach (var setting in allSettings)
-                        {
-                            var sectionField = setting.GetType().GetField("section");
-                            if (sectionField != null)
-                            {
-                                var section = sectionField.GetValue(setting) as string;
-                                if (section == sectionName)
-                                    result.Add(setting);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                LogError($"Error getting settings in section: {e}");
-            }
-
-            return result;
-        }
-
         #endregion
 
         #region Public API - Status Check
@@ -520,205 +295,6 @@ namespace RuntimeSettingsAPI
 
         #endregion
 
-        #region Public API - Hide/Show Settings
-
-        /// <summary>
-        /// Hide a specific setting by name
-        /// If the mod's settings are not loaded yet, the operation will be queued
-        /// </summary>
-        public static bool HideSetting(string modName, string settingName)
-        {
-            if (!reflectionInitialized)
-            {
-                LogWarning("Runtime Settings API not initialized yet - ExtraSettingsAPI may not be loaded");
-                return false;
-            }
-
-            var mod = FindMod(modName);
-            if (mod == null)
-            {
-                AddPendingOperation(modName, OperationType.HideSetting, settingName);
-                return true;
-            }
-
-            return HideSettingInternal(modName, settingName);
-        }
-        
-        private static bool HideSettingInternal(string modName, string settingName)
-        {
-            var mod = FindMod(modName);
-            if (mod == null)
-            {
-                LogWarning($"Mod '{modName}' not found");
-                return false;
-            }
-
-            var setting = FindSetting(mod, settingName);
-            if (setting == null)
-            {
-                LogWarning($"Setting '{settingName}' not found in mod '{modName}'");
-                return false;
-            }
-
-            var state = GetOrCreateState(modName, settingName);
-            state.IsVisible = false;
-            state.WasModified = true;
-
-            // Update UI if control exists
-            var controlProp = setting.GetType().GetProperty("control");
-            if (controlProp != null)
-            {
-                var control = controlProp.GetValue(setting) as GameObject;
-                if (control != null)
-                    control.SetActive(false);
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Show a previously hidden setting
-        /// </summary>
-        public static bool ShowSetting(string modName, string settingName)
-        {
-            if (!reflectionInitialized)
-            {
-                LogWarning("Runtime Settings API not initialized yet - ExtraSettingsAPI may not be loaded");
-                return false;
-            }
-
-            var mod = FindMod(modName);
-            if (mod == null)
-            {
-                LogWarning($"Mod '{modName}' not found");
-                return false;
-            }
-
-            var setting = FindSetting(mod, settingName);
-            if (setting == null)
-            {
-                LogWarning($"Setting '{settingName}' not found in mod '{modName}'");
-                return false;
-            }
-
-            var state = GetOrCreateState(modName, settingName);
-            state.IsVisible = true;
-            state.WasModified = true;
-
-            // Update UI if control exists
-            var controlProp = setting.GetType().GetProperty("control");
-            if (controlProp != null)
-            {
-                var control = controlProp.GetValue(setting) as GameObject;
-                if (control != null)
-                {
-                    // Check if should be shown using ShouldShow method
-                    var shouldShowMethod = setting.GetType().GetMethod("ShouldShow");
-                    if (shouldShowMethod != null)
-                    {
-                        // Get IsInWorld
-                        var isInWorldField = extraSettingsAPIType.GetField("IsInWorld", BindingFlags.Public | BindingFlags.Static);
-                        bool isInWorld = isInWorldField != null && (bool)isInWorldField.GetValue(null);
-                        
-                        bool shouldShow = (bool)shouldShowMethod.Invoke(setting, new object[] { !isInWorld });
-                        if (shouldShow)
-                            control.SetActive(true);
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Hide an entire section and all its child settings
-        /// If the mod's settings are not loaded yet, the operation will be queued
-        /// </summary>
-        public static bool HideSection(string modName, string sectionName)
-        {
-            if (!reflectionInitialized)
-            {
-                LogWarning("Runtime Settings API not initialized yet - ExtraSettingsAPI may not be loaded");
-                return false;
-            }
-
-            var mod = FindMod(modName);
-            if (mod == null)
-            {
-                AddPendingOperation(modName, OperationType.HideSection, sectionName);
-                return true;
-            }
-
-            return HideSectionInternal(modName, sectionName);
-        }
-        
-        private static bool HideSectionInternal(string modName, string sectionName)
-        {
-            var mod = FindMod(modName);
-            if (mod == null)
-            {
-                LogWarning($"Mod '{modName}' not found");
-                return false;
-            }
-
-            var section = FindSetting(mod, sectionName);
-            if (section != null)
-                HideSettingInternal(modName, sectionName);
-
-            var settingsInSection = GetSettingsInSection(mod, sectionName);
-            foreach (var setting in settingsInSection)
-            {
-                var nameField = setting.GetType().GetField("name");
-                if (nameField != null)
-                {
-                    var name = nameField.GetValue(setting) as string;
-                    if (!string.IsNullOrEmpty(name))
-                        HideSettingInternal(modName, name);
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Show an entire section and all its child settings
-        /// </summary>
-        public static bool ShowSection(string modName, string sectionName)
-        {
-            if (!reflectionInitialized)
-            {
-                LogWarning("Runtime Settings API not initialized yet - ExtraSettingsAPI may not be loaded");
-                return false;
-            }
-
-            var mod = FindMod(modName);
-            if (mod == null)
-            {
-                LogWarning($"Mod '{modName}' not found");
-                return false;
-            }
-
-            var section = FindSetting(mod, sectionName);
-            if (section != null)
-                ShowSetting(modName, sectionName);
-
-            var settingsInSection = GetSettingsInSection(mod, sectionName);
-            foreach (var setting in settingsInSection)
-            {
-                var nameField = setting.GetType().GetField("name");
-                if (nameField != null)
-                {
-                    var name = nameField.GetValue(setting) as string;
-                    if (!string.IsNullOrEmpty(name))
-                        ShowSetting(modName, name);
-                }
-            }
-
-            return true;
-        }
-
-        #endregion
-
         #region Public API - Enable/Disable Settings
 
         /// <summary>
@@ -726,6 +302,12 @@ namespace RuntimeSettingsAPI
         /// </summary>
         public static bool DisableSetting(string modName, string settingName)
         {
+            if (!reflectionInitialized)
+            {
+                LogWarning("Runtime Settings API not initialized yet - ExtraSettingsAPI may not be loaded");
+                return false;
+            }
+
             var mod = FindMod(modName);
             if (mod == null)
             {
@@ -753,6 +335,12 @@ namespace RuntimeSettingsAPI
         /// </summary>
         public static bool EnableSetting(string modName, string settingName)
         {
+            if (!reflectionInitialized)
+            {
+                LogWarning("Runtime Settings API not initialized yet - ExtraSettingsAPI may not be loaded");
+                return false;
+            }
+
             var mod = FindMod(modName);
             if (mod == null)
             {
@@ -844,15 +432,6 @@ namespace RuntimeSettingsAPI
         #region Public API - Query State
 
         /// <summary>
-        /// Check if a setting is currently visible
-        /// </summary>
-        public static bool IsSettingVisible(string modName, string settingName)
-        {
-            var state = TryGetState(modName, settingName);
-            return state?.IsVisible ?? true;
-        }
-
-        /// <summary>
         /// Check if a setting is currently enabled
         /// </summary>
         public static bool IsSettingEnabled(string modName, string settingName)
@@ -922,10 +501,7 @@ namespace RuntimeSettingsAPI
                     {
                         var setting = FindSetting(mod, settingName);
                         if (setting != null)
-                        {
-                            ShowSetting(modName, settingName);
                             EnableSetting(modName, settingName);
-                        }
                     }
                     
                     return true;

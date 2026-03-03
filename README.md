@@ -1,14 +1,13 @@
 ﻿# Runtime Settings API for Raft
 
-A mod that extends Extra Settings API with the ability to hide, show, enable, or disable settings at runtime  without restarting the game or reloading the mod.
+A mod that extends Extra Settings API with the ability to disable or enable settings at runtime without restarting the game or reloading the mod.
+
+> **Note on hiding/showing settings:** Extra Settings API already supports toggling setting visibility while the settings menu is open via [`CheckSettingVisibility`](https://github.com/Aidanamite/Extra-Settings-API/wiki/API-Calls#void-checksettingvisibility) and [`HandleSettingVisible`](https://github.com/Aidanamite/Extra-Settings-API/wiki/API-Events#handlesettingvisiblestringbool). Use those built-in features for visibility control. This mod focuses solely on the ability to keep settings visible but non-interactive (disabled/grayed out).
 
 ## Features
 
-- Hide or show individual settings or entire sections at runtime
-- Enable or disable settings (visible but non-interactive)
-- Query the current visibility and enabled state of any setting
-- Operations are queued automatically if settings have not loaded yet
-- Hidden state persists across settings panel open/close cycles
+- Disable or enable settings (visible but non-interactive/grayed out)
+- Query the current enabled state of any setting
 - Works with all Extra Settings API setting types
 - Client-side only (does not require all players to have it installed)
 
@@ -34,14 +33,13 @@ Runtime Settings API has no user-facing settings of its own. It operates silentl
 
 ## How It Works
 
-Runtime Settings API uses reflection to locate Extra Settings API after it has loaded. Once found, it applies a Harmony postfix to `ModSettingContainer.ToggleSettings` so that any settings marked as hidden remain hidden even after the settings panel is reopened or sections are collapsed and expanded.
+Runtime Settings API uses reflection to locate Extra Settings API after it has loaded. Once found, it provides a simple interface for disabling settings, making them visible but non-interactive.
 
 Mods interact with Runtime Settings API through `RuntimeSettingsAPIHelper.cs`, a self-contained helper class that:
 
 1. Scans loaded assemblies for the Runtime Settings API mod at runtime
 2. Polls silently until it is available (up to a configurable timeout)
 3. Calls the appropriate API method once ready
-4. Queues operations if called before the target mod's settings have loaded
 
 ## Building from Source
 
