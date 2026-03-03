@@ -1,13 +1,13 @@
 ﻿# Runtime Settings API for Raft
 
-> ##DEPRECATED - No longer needed
->
-> Extra Settings API's built-in `ExtraSettingsAPI_HandleSettingVisible` callback natively supports runtime visibility changes without a separate mod. **No new versions of Runtime Settings API will be released.**
->
-> **Players:** You can safely uninstall this mod.
->
-> **Developers:** Migrate to `ExtraSettingsAPI_HandleSettingVisible`. Set `"access": "GlobalCustom"` on any setting you want to control dynamically, then implement the callback in your mod class:
->
+##DEPRECATED - No longer needed
+
+Extra Settings API's built-in `ExtraSettingsAPI_HandleSettingVisible` callback natively supports runtime visibility changes without a separate mod. **No new versions of Runtime Settings API will be released.**
+
+**Players:** You can safely uninstall this mod.
+
+**Developers:** Migrate to `ExtraSettingsAPI_HandleSettingVisible`. Set `"access": "GlobalCustom"` on any setting you want to control dynamically, then implement the callback in your mod class:
+
 > ```csharp
 > public bool ExtraSettingsAPI_HandleSettingVisible(string settingName, bool isInWorld)
 > {
@@ -16,8 +16,8 @@
 >     return true;
 > }
 > ```
->
-> ExtraSettingsAPI calls this automatically whenever the settings panel evaluates visibility - no Harmony patching, no helper file, no extra dependency required.
+
+ExtraSettingsAPI calls this automatically whenever the settings panel evaluates visibility - no Harmony patching, no helper file, no extra dependency required.
 
 ---
 
