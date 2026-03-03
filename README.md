@@ -1,6 +1,6 @@
 ﻿# Runtime Settings API for Raft
 
-##DEPRECATED - No longer needed
+## DEPRECATED - No longer needed
 
 Extra Settings API's built-in `ExtraSettingsAPI_HandleSettingVisible` callback natively supports runtime visibility changes without a separate mod. **No new versions of Runtime Settings API will be released.**
 
