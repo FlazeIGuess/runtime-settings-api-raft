@@ -10,7 +10,7 @@
   "requiredByAllPlayers": false,
   "isModPermanent": false,
   "excludedFiles": [],
-  "updateUrl": "",
+  "updateUrl": "https://www.raftmodding.com/api/v1/mods/runtime-settings-api/version.txt",
   "requiredMods": [
     {
       "name": "ExtraSettingsAPI",
