@@ -1,7 +1,7 @@
 {
   "name": "RuntimeSettingsAPI",
   "version": "1.0.0",
-  "description": "Extends Extra Settings API with runtime manipulation of settings visibility and state",
+  "description": "[DEPRECATED] This mod is no longer needed. ExtraSettingsAPI HandleSettingVisible natively supports runtime visibility changes. No new versions will be released.",
   "author": "Community",
   "license": "MIT",
   "icon": "icon.png",

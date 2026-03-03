@@ -1,79 +1,33 @@
 ﻿# Runtime Settings API for Raft
 
-A mod that extends Extra Settings API with the ability to hide, show, enable, or disable settings at runtime  without restarting the game or reloading the mod.
+> ##DEPRECATED - No longer needed
+>
+> Extra Settings API's built-in `ExtraSettingsAPI_HandleSettingVisible` callback natively supports runtime visibility changes without a separate mod. **No new versions of Runtime Settings API will be released.**
+>
+> **Players:** You can safely uninstall this mod.
+>
+> **Developers:** Migrate to `ExtraSettingsAPI_HandleSettingVisible`. Set `"access": "GlobalCustom"` on any setting you want to control dynamically, then implement the callback in your mod class:
+>
+> ```csharp
+> public bool ExtraSettingsAPI_HandleSettingVisible(string settingName, bool isInWorld)
+> {
+>     if (settingName == "mySection" || settingName == "mySetting")
+>         return someCondition;
+>     return true;
+> }
+> ```
+>
+> ExtraSettingsAPI calls this automatically whenever the settings panel evaluates visibility - no Harmony patching, no helper file, no extra dependency required.
 
-## Features
+---
 
-- Hide or show individual settings or entire sections at runtime
-- Enable or disable settings (visible but non-interactive)
-- Query the current visibility and enabled state of any setting
-- Operations are queued automatically if settings have not loaded yet
-- Hidden state persists across settings panel open/close cycles
-- Works with all Extra Settings API setting types
-- Client-side only (does not require all players to have it installed)
+## What this mod was
 
-## Installation
+Runtime Settings API was a standalone mod that extended Extra Settings API with the ability to hide, show, enable, or disable settings at runtime - without restarting the game or reloading the mod. It worked by using reflection to hook into ExtraSettingsAPI internals and applying a Harmony postfix to `ModSettingContainer.ToggleSettings` to persist hidden state across panel open/close cycles.
 
-### For Players
+It turned out that ExtraSettingsAPI's own `HandleSettingVisible` event already covers the core visibility use case natively, making this mod unnecessary for the primary use case.
 
-1. Install [RaftModLoader](https://www.raftmodding.com/loader)
-2. Install [Extra Settings API](https://www.raftmodding.com/mods/extra-settings-api)
-3. Download the latest `RuntimeSettingsAPI.rmod` from the [releases page](https://github.com/FlazeIGuess/runtime-settings-api-raft/releases)
-4. Place the `.rmod` file in your RaftModLoader mods folder
-5. Launch Raft through RaftModLoader
-
-### For Mod Developers
-
-You do not need to add Runtime Settings API as a hard dependency. Instead, copy `RuntimeSettingsAPIHelper.cs` into your mod project. The helper detects Runtime Settings API at runtime and handles all communication automatically.
-
-See [WIKI.md](WIKI.md) for full integration instructions and API reference.
-
-## Configuration
-
-Runtime Settings API has no user-facing settings of its own. It operates silently in the background and is only relevant to other mod developers.
-
-## How It Works
-
-Runtime Settings API uses reflection to locate Extra Settings API after it has loaded. Once found, it applies a Harmony postfix to `ModSettingContainer.ToggleSettings` so that any settings marked as hidden remain hidden even after the settings panel is reopened or sections are collapsed and expanded.
-
-Mods interact with Runtime Settings API through `RuntimeSettingsAPIHelper.cs`, a self-contained helper class that:
-
-1. Scans loaded assemblies for the Runtime Settings API mod at runtime
-2. Polls silently until it is available (up to a configurable timeout)
-3. Calls the appropriate API method once ready
-4. Queues operations if called before the target mod's settings have loaded
-
-## Building from Source
-
-### Prerequisites
-
-- Visual Studio 2019 or later
-- .NET Framework 4.8
-- Raft game installed
-- RaftModLoader installed
-
-### Build Steps
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/FlazeIGuess/runtime-settings-api-raft.git
-   cd runtime-settings-api-raft
-   ```
-
-2. Update the reference paths in `RuntimeSettingsAPI/RuntimeSettingsAPI.csproj` to match your Raft installation directory
-
-3. Build the solution:
-   ```bash
-   msbuild RuntimeSettingsAPI.sln /p:Configuration=Debug
-   ```
-
-   Or open `RuntimeSettingsAPI.sln` in Visual Studio and build from there
-
-4. The mod will be automatically packaged as `RuntimeSettingsAPI.rmod` in the root directory
-
-## Contributing
-
-Contributions are welcome. Please fork the repository, create a branch for your change, and open a pull request with a clear description of what was changed and why.
+The one feature that has no ExtraSettingsAPI equivalent is **disabling settings** (visible but grayed out and non-interactive). If that is relevant to your mod, the source code remains available below.
 
 ## License
 
@@ -85,8 +39,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with [RaftModLoader](https://www.raftmodding.com/)
 - Uses [Harmony](https://github.com/pardeike/Harmony) for runtime patching
 - Created by Flaze
-
-## Support
-
 - Report bugs on the [Issues page](https://github.com/FlazeIGuess/runtime-settings-api-raft/issues)
 - Join the [Raft Modding Discord](https://www.raftmodding.com/discord)
